@@ -1,0 +1,29 @@
+# Test profile: Spring slices run on an embedded H2 and Hibernate creates the schema.
+# Flyway is disabled here because its scripts target PostgreSQL.
+spring:
+  datasource:
+    url: jdbc:h2:mem:transactions;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+
+app:
+  limit:
+    default-sum: 1000.00
+    currency: USD
+  exchange:
+    base-currency: USD
+    pairs:
+      - EUR/USD
+    api-key: ""
+    fetch-enabled: false
+    seed-rates: {}
+
+logging:
+  level:
+    ru.yaroslav_pavlenko.TransactionsRestApi: WARN
