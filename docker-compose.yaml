@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: transactions-postgres
+    environment:
+      POSTGRES_DB: transactions
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d transactions" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  cassandra:
+    image: cassandra:4.1
+    container_name: transactions-cassandra
+    environment:
+      CASSANDRA_CLUSTER_NAME: transactions
+      CASSANDRA_DC: datacenter1
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+      # Single-node cluster for local runs; the heap is capped so it does not eat the machine.
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 128M
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    healthcheck:
+      test: [ "CMD-SHELL", "cqlsh -e 'describe keyspaces' || exit 1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+  transactions-service:
+    build:
+      context: .
+    image: transactions-service:latest
+    container_name: transactions-service
+    environment:
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/transactions
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      CASSANDRA_CONTACT_POINTS: cassandra
+      CASSANDRA_PORT: 9042
+      CASSANDRA_KEYSPACE: transactions
+      CASSANDRA_DATACENTER: datacenter1
+      # twelvedata key; without it the service runs on the demo rates.
+      TWELVEDATA_API_KEY: ${TWELVEDATA_API_KEY:-}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cassandra:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8080/actuator/health" ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  cassandra-data:
